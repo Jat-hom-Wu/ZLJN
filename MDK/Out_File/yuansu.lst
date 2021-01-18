@@ -1,0 +1,128 @@
+C51 COMPILER V9.60.0.0   YUANSU                                                            08/05/2020 22:00:20 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE YUANSU
+OBJECT MODULE PLACED IN .\Out_File\yuansu.obj
+COMPILER INVOKED BY: D:\keil_v5\C51\BIN\C51.EXE ..\Libraries\Control\yuansu.c LARGE OPTIMIZE(8,SPEED) BROWSE MODP2 INCDI
+                    -R(..\Libraries\libraries;..\Libraries\seekfree_libraries;..\Libraries\seekfree_peripheral;..\USER\inc;..\USER\src;..\Lib
+                    -raries\Control) DEBUG OBJECTEXTEND PRINT(.\Out_File\yuansu.lst) TABS(2) OBJECT(.\Out_File\yuansu.obj)
+
+line level    source
+
+   1          #include"headfile.h"
+   2          
+   3          //竖直电感进环，进环后切换水平电感（方法2）
+   4          uint8 round_flag,round_left,round_right,ON=0,OFF=1;  //round_flag进出环岛判断标志， round_leftflag检测到左
+             -环岛标志，round_left环岛操作控制标志
+   5          //float mid_AD_shuiping,left_AD_shuzhi,right_AD_shuzhi;
+   6          //float left_distance,right_distance;       //进入左或右环岛后走过的路程
+   7            void round_judge(){
+   8   1          if((round_flag == ON))
+   9   1          {
+  10   2            if(mid_AD_shuiping-MID_AD_SHUIPING_OFFEST>0&&left_AD_shuzhi-LEFT_AD_SHUZHI_OFFEST>0&&right_AD_shuzhi
+             --RIGHT_AD_SHUZHI_OFFEST>0)                          //电感检测值
+  11   2            {
+  12   3                round_left=1;            //检测到左环岛                                     
+  13   3                round_flag = ON;
+  14   3                left_huandao_distance_flag=1;                                 // left_distance+=g_fCarSpeed;
+  15   3            }
+  16   2            
+  17   2             if(mid_AD_shuiping-MID_AD_SHUIPING_OFFEST>0&&left_AD_shuzhi-LEFT_AD_SHUZHI_OFFEST>0&&right_AD_shuzhi-R
+             -IGHT_AD_SHUZHI_OFFEST>0)                          //电感检测值
+  18   2            {
+  19   3                round_right=1;            //检测到右环岛                                     
+  20   3                round_flag = ON;
+  21   3                right_huandao_distance_flag=1;                                                              //right_distance+=g_fCarSpeed;
+  22   3            }
+  23   2       
+  24   2            
+  25   2            if((round_left == 1)&&(round_flag == ON))      //确定环岛开启，且为左环岛后进行控制
+  26   2            {
+  27   3              //根据旧的电磁值，暴力改变新电磁值，强行转向
+  28   3              //float Voltage_right_increase1;            //电磁增量
+  29   3              //g_fRightVoltageSigma+=Voltage_right_increase1;    //增大右电感后的值
+  30   3              
+  31   3              diangan_flag=1;                           //变为由竖直电感循迹
+  32   3              
+  33   3              if(left_huandao_distance>0) //判断条件，确定车子已经完全进入环岛
+  34   3                {
+  35   4                  diangan_flag=0;                 //控制，由水平电感控制通过环岛
+  36   4                round_flag= OFF;
+  37   4                
+  38   4                 round_left=2;                     //进入环岛后改变状态位，为后续出岛做准备
+  39   4               left_huandao_distance_flag=0;        //不再进行路径积分
+  40   4                }
+  41   3            }
+  42   2        
+  43   2            
+  44   2             if((round_right== 1)&&(round_flag == ON))       //确定环岛开启，且为右环岛后进行控制
+  45   2            {
+  46   3              //根据旧的电磁值，暴力改变新电磁值，强行转向
+  47   3            //  float Voltage_left_increase1;           //电磁增量
+  48   3            //  g_fLeftVoltageSigma+=Voltage_left_increase1;    //增大左电感后的值
+  49   3              
+  50   3                diangan_flag=1;                  //控制，由竖直电感控制进入环岛
+C51 COMPILER V9.60.0.0   YUANSU                                                            08/05/2020 22:00:20 PAGE 2   
+
+  51   3              
+  52   3              
+  53   3            if(right_huandao_distance>0) //判断条件，确定车子已经完全进入环岛
+  54   3                {
+  55   4                    diangan_flag=0;                               //控制，由水平电感控制过环岛
+  56   4                round_flag= OFF;
+  57   4                
+  58   4                 round_right=2;                    //进入环岛后改变状态位，为后续出岛做准备
+  59   4               right_huandao_distance_flag=0;       //不再进行路径积分
+  60   4                }
+  61   3            }
+  62   2       
+  63   2          }
+  64   1       
+  65   1       
+  66   1         if((round_flag==OFF)&&(round_left==2))  {
+  67   2         if(mid_AD_shuiping-MID_AD_SHUIPING_OFFEST>0)                   //电感出左岛检测
+  68   2         {
+  69   3              round_left=3;
+  70   3              
+  71   3         }
+  72   2         if(round_left==3)   {
+  73   3                                                          //执行出岛控制,限制陀螺仪大小
+  74   3                                                          //根据旧的电磁值，暴力改变新电磁值，强行转向
+  75   3              //float Voltage_left_increase2;               //电磁增量
+  76   3              //g_fLeftVoltageSigma-=Voltage_left_increase2;//减小左电感后的值  
+  77   3              round_flag=0;                                 //环岛标志打开
+  78   3                             }                            
+  79   2         
+  80   2         }
+  81   1         
+  82   1         
+  83   1         if((round_flag==OFF)&&(round_right==2))  {
+  84   2         if(mid_AD_shuiping-MID_AD_SHUIPING_OFFEST>0)                   //电感出右岛检测
+  85   2         {
+  86   3              round_right=3;
+  87   3              
+  88   3         }
+  89   2         if(round_right==3)  { 
+  90   3                                                                                      //执行出岛控制
+  91   3                                                                                      //根据旧的电磁值，暴力改变新电磁值，强行转向
+  92   3              //float Voltage_right_increase2;                                          //电磁增量
+  93   3              //g_fRightVoltageSigma-=Voltage_right_increase2;                          //减小右电感后的值
+  94   3              round_flag=0;                                                             //环岛标志打开
+  95   3                             }
+  96   2         }
+  97   1        
+  98   1       }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    491    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      7    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

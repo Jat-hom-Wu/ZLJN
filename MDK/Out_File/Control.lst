@@ -1,0 +1,560 @@
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE CONTROL
+OBJECT MODULE PLACED IN .\Out_File\Control.obj
+COMPILER INVOKED BY: D:\keil_v5\C51\BIN\C51.EXE ..\Libraries\Control\Control.c LARGE OPTIMIZE(8,SPEED) BROWSE MODP2 INCD
+                    -IR(..\Libraries\libraries;..\Libraries\seekfree_libraries;..\Libraries\seekfree_peripheral;..\USER\inc;..\USER\src;..\Li
+                    -braries\Control) DEBUG OBJECTEXTEND PRINT(.\Out_File\Control.lst) TABS(2) OBJECT(.\Out_File\Control.obj)
+
+line level    source
+
+   1          #include "Control.h"
+   2          
+   3          float VOLTAGE_GRAVITY,VOLTAGE_GYRO;   //¼ÓËÙ¶È¼ÆZÖá»ñÈ¡Êý¾Ý£¬ÍÓÂÝÒÇ½ÇËÙ¶È»ñÈ¡Êý¾Ý
+   4          float g_fGravityAngle,g_fGyroscopeAngleSpeed;   //¼ÓËÙ¶È¼ÆZÖá×îÖÕÊý¾Ý,ÍÓÂÝÒÇ½ÇËÙ¶È×îÖÕÊý¾Ý
+   5          unsigned int AD_average;
+   6          unsigned int AD_data[10];   //´æ·ÅÍÓÂÝÒÇÊý¾ÝµÄ
+   7          float g_fCarAngle;    
+   8          float g_fGyroscopeAngleIntegral=0;    //»ý·ÖºóµÄ½Ç¶È
+   9          float g_fAngleControlOut, g_fSpeedControlOut,g_fDirectionControlOut;    //Ö±Á¢¿ØÖÆÊä³öÁ¿,ËÙ¶È¿ØÖÆÊä³öÁ¿,·½Ïò
+             -¿ØÖÆÊä³öÁ¿
+  10          float g_fCarSpeed;    
+  11          int g_nLeftMotorPulseSigma,g_nRightMotorPulseSigma,DIR_CONTROL_D_VALUE;   //×ó±àÂëÆ÷Âö³åÊý£¬ÓÒ±àÂëÆ÷Âö³åÊý,
+             -³µÄ£×ª¶¯²âÁ¿ÍÓÂÝÒÇ
+  12          float g_fSpeedControlIntegral;    
+  13          float g_fSpeedControlOutOld, g_fSpeedControlOutNew;
+  14          float g_fLeftVoltageSigma,g_fRightVoltageSigma,turn;    //µç´Å¼ì²â×óÂö³å£¬µç´Å¼ì²âÓÒÂö³å,×ªÏò 
+  15          float g_fDirectionControlOutOld , g_fDirectionControlOutNew;
+  16          float g_fLeftMotorOut , g_fRightMotorOut;
+  17          float mid_AD_shuiping,left_AD_shuzhi,right_AD_shuzhi;   //×ó£¬ÖÐ£¬ÓÒÊúÖ±µç¸ÐÖµ
+  18          float left_AD_shuiping,right_AD_shuiping;                //×óÓÒË®Æ½µç¸ÐÖµ
+  19          int  diangan_flag=0,turn_flag=0;
+  20          float fe,fec;                                             //µç¸ÐÆ«²îÖµ
+  21          float SPEED_CONTROL_OUT_MAX,SPEED_CONTROL_OUT_MIN;        //»ý·Ö±¥ºÍ
+  22          
+  23          float OutData[4] = { 0 };
+  24          
+  25          extern int GYRO_set;
+  26          extern int MMA_set;
+  27          extern int speed_set;
+  28          extern float ANGLE_P,ANGLE_D;
+  29          extern float SPEED_P,SPEED_I;
+  30          extern float DIR_P,DIR_D;
+  31          
+  32          
+  33          
+  34          //**************************************************************************    
+  35          //  @brief      AD²É¼¯¼ÓËÙ¶È¼ÆZÖá¡¢ÍÓÂÝÒÇ
+  36          //  @return     void
+  37          //  º¯Êý½á¹û£º  ²É¼¯µ½µÄZÖá¡¢ÍÓÂÝÒÇµÄÊý¾Ý
+  38          //**************************************************************************
+  39          void Rd_Ad_Value(void){
+  40   1      
+  41   1        int j=0;
+  42   1      
+  43   1          VOLTAGE_GRAVITY = icm_acc_z;   //Z ¼ÓËÙ¶È¼Æ²â£¨½Ç¶È£©  
+  44   1             
+  45   1          for(j=0;j<10;j++)
+  46   1          {
+  47   2            VOLTAGE_GYRO = icm_gyro_y;    // gyroÍÓÂÝÒÇ£¨½ÇËÙ¶È£©  £¨·½Ïò¿ÉÄÜÐèÒª¸Ä¶¯£©
+  48   2            AD_data[j]= VOLTAGE_GYRO;
+  49   2          }
+  50   1            AD_average=(AD_data[1]+AD_data[2]+AD_data[3]+AD_data[4]+AD_data[5]+AD_data[6]+AD_data[7]+AD_data[8])
+             -/8;
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 2   
+
+  51   1            VOLTAGE_GYRO =  AD_average;
+  52   1      
+  53   1      }
+  54          
+  55          //**************************************************************************
+  56          //  @brief      ½Ç¶È¼ÆËãº¯Êý
+  57          //  @return     void
+  58          //  ²ÎÊý£ºGRAVITY_OFFSET£º¼ÓËÙ¶È¼ÆZÖáÁãÆ«Öµ
+  59          //      GRAVITY_ANGLE_RATIO£º¹éÒ»»¯±ÈÀýÏµÊý                        
+  60          //      GRAVITY_ADJUST_TIME_CONSTANT  Ê±¼äÐ£ÕýÏµÊý      ¶¨Ê±Æ÷Ê±¼ä µ¥Î»s
+  61          //  º¯Êý½á¹û£ºÖ±Á¢Çé¿öÏÂµÄ½Ç¶È
+  62          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+  63          //**************************************************************************
+  64          void AngleCalculate(void) 
+  65          {
+  66   1           
+  67   1          float fDeltaValue;
+  68   1        
+  69   1          g_fGravityAngle = (VOLTAGE_GRAVITY - MMA_set) *GRAVITY_ANGLE_RATIO;     //¼ÓËÙ¶È¼Æ Z
+  70   1      
+  71   1          g_fGyroscopeAngleSpeed = (VOLTAGE_GYRO - GYRO_set) *GYROSCOPE_ANGLE_RATIO;   //ÍÓÂÝÒÇ½ÇËÙ¶È
+  72   1      
+  73   1          g_fCarAngle = g_fGyroscopeAngleIntegral;    //×îÖÕÈÚºÏ½Ç¶È    
+  74   1          fDeltaValue = (g_fGravityAngle - g_fCarAngle) /GRAVITY_ADJUST_TIME_CONSTANT;  //Ê±¼äÏµÊý½ÃÕý
+  75   1      
+  76   1          g_fGyroscopeAngleIntegral += (g_fGyroscopeAngleSpeed + fDeltaValue) *GYROSCOPE_ANGLE_SIGMA_FREQUENCY;   
+             -  //ÈÚºÏ½Ç¶È
+  77   1      }
+  78          
+  79          //**************************************************************************
+  80          //  @brief      Ö±Á¢¿ØÖÆº¯Êý
+  81          //  @return     void
+  82          //  º¯Êý½á¹û£º  Ö±Á¢Çé¿öÏÂµÄÊä³öÁ¿
+  83          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+  84          //**************************************************************************
+  85          void AngleControl(void) {
+  86   1      
+  87   1          float fValue;
+  88   1      
+  89   1          fValue = (CAR_ANGLE_SET - g_fCarAngle) * ANGLE_P +
+  90   1                 (CAR_ANGLE_SPEED_SET - g_fGyroscopeAngleSpeed) *ANGLE_D;
+  91   1      
+  92   1      /*
+  93   1        if(fValue > ANGLE_CONTROL_OUT_MAX)    //Êä³öÏÞ·ù
+  94   1          fValue = ANGLE_CONTROL_OUT_MAX;
+  95   1      
+  96   1          else if(fValue < ANGLE_CONTROL_OUT_MIN)                   
+  97   1          fValue = ANGLE_CONTROL_OUT_MIN;   
+  98   1      */
+  99   1      
+ 100   1          g_fAngleControlOut = fValue;
+ 101   1      }
+ 102          
+ 103          //**************************************************************************
+ 104          //  @brief      »ñÈ¡Ð¡³µËÙ¶È
+ 105          //  º¯ÊýËµÃ÷    µ¥Î»Ê±¼äÄÚ²É¼¯µ½µÄÂö³åÊý¼´¿É´ú±íÐ¡³µËÙ¶È
+ 106          //  @return     void
+ 107          //  º¯Êý½á¹û£º  Âö³åËÙ¶È
+ 108          //
+ 109          //**************************************************************************
+ 110          void GetMotorPulse(void)
+ 111          {
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 3   
+
+ 112   1          if(DIR_L == 1)
+ 113   1          {
+ 114   2              g_nLeftMotorPulseSigma = ctimer_count_read(CTIM3_P04);    
+ 115   2          }
+ 116   1          else
+ 117   1          {
+ 118   2              g_nLeftMotorPulseSigma = -ctimer_count_read(CTIM3_P04); 
+ 119   2          }
+ 120   1          if(DIR_R == 1)
+ 121   1          {
+ 122   2              g_nRightMotorPulseSigma = ctimer_count_read(CTIM0_P34);     
+ 123   2          }
+ 124   1          else
+ 125   1          {
+ 126   2              g_nRightMotorPulseSigma = -ctimer_count_read(CTIM0_P34); 
+ 127   2          }
+ 128   1        
+ 129   1          ctimer_count_clean(CTIM3_P04);
+ 130   1          ctimer_count_clean(CTIM0_P34);
+ 131   1      }
+ 132          
+ 133          
+ 134          //**************************************************************************
+ 135          //  @brief      ËÙ¶È¿ØÖÆ
+ 136          //  @return     void
+ 137          //  ²ÎÊý    CAR_SPEED_SETfDelta  £º¸ø¶¨ËÙ¶È
+ 138          //  º¯Êý½á¹û£º  ËÙ¶È¼ÆËã
+ 139          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+ 140          //**************************************************************************
+ 141          void SpeedControl(void) {
+ 142   1      
+ 143   1          float fDelta;                             
+ 144   1          float fP, fI;                          
+ 145   1      
+ 146   1          g_fCarSpeed = (g_nLeftMotorPulseSigma + g_nRightMotorPulseSigma) / 2;
+ 147   1      
+ 148   1          g_nLeftMotorPulseSigma = g_nRightMotorPulseSigma = 0;   //Âö³åÇåÁã
+ 149   1          g_fCarSpeed *= CAR_SPEED_CONSTANT;    //Âö³åÊýÆ½¾ùÖµ³ËÒÔ±ÈÀýÖµ
+ 150   1          speed_now = g_fCarSpeed*20.1;         //×ª»»ÎªËÙ¶Ècm/s
+ 151   1              
+ 152   1          fDelta = speed_set - g_fCarSpeed;
+ 153   1          fP = fDelta * SPEED_P;
+ 154   1          fI = fDelta * SPEED_I;
+ 155   1      
+ 156   1          g_fSpeedControlIntegral += fI;    //»ý·Ö  ÏÂÃæÓÐ±¥ºÍ´¦Àí£¬·ÀÖ¹»ý·Ö±¥ºÍ
+ 157   1        
+ 158   1          if(g_fSpeedControlIntegral > SPEED_CONTROL_OUT_MAX)    //·ÀÖ¹»ý·Ö±¥ºÍ
+ 159   1              g_fSpeedControlIntegral = SPEED_CONTROL_OUT_MAX;
+ 160   1         if(g_fSpeedControlIntegral < SPEED_CONTROL_OUT_MIN)    
+ 161   1               g_fSpeedControlIntegral = SPEED_CONTROL_OUT_MIN;
+ 162   1      
+ 163   1          g_fSpeedControlOutOld = g_fSpeedControlOutNew;
+ 164   1          g_fSpeedControlOutNew = fP + g_fSpeedControlIntegral;   //×îÐÂËÙ¶È¼ÆËãÖµ
+ 165   1      }
+ 166          
+ 167          //**************************************************************************
+ 168          //  @brief      ËÙ¶ÈÆ½»¬Êä³öº¯Êý
+ 169          //  @return     void
+ 170          //  ²ÎÊý    SPEED_CONTROL_COUNT £º²îÖµÊä³öÆ½¾ùµ½20¸öÖÜÆÚ
+ 171          //  º¯Êý½á¹û£º  ËÙ¶ÈÊä³öÖµ
+ 172          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+ 173          //**************************************************************************
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 4   
+
+ 174          void SpeedControlOutput(void) {
+ 175   1      
+ 176   1          float fValue;
+ 177   1      
+ 178   1          fValue = g_fSpeedControlOutNew - g_fSpeedControlOutOld;   //Á½´ÎËÙ¶È¼ÆËã²îÖµ
+ 179   1          g_fSpeedControlOut = fValue *  1 / SPEED_CONTROL_COUNT + g_fSpeedControlOutOld;
+ 180   1      }
+ 181          
+ 182          //**************************************************************************
+ 183          //  @brief      AD²É¼¯µç¸ÐÏßÈ¦
+ 184          //  @return     void
+ 185          //  º¯Êý½á¹û£º  ËÙ¶ÈÊä³öÖµ
+ 186          //**************************************************************************
+ 187          void get_AD_Date(void)
+ 188          {  
+ 189   1          float vr[DIRECTION_COUNT];    
+ 190   1          int  i,j;
+ 191   1          float vracc,change;
+ 192   1        
+ 193   1          //float mid_AD_shuiping=0;
+ 194   1          //float left_AD_shuiping=0;
+ 195   1          //float right_AD_shuiping=0;
+ 196   1          //float left_AD_shuzhi=0;
+ 197   1          //float right_AD_shuzhi=0;
+ 198   1          int temp=0;
+ 199   1           
+ 200   1      ////////////////////////ÖÐ¼äË®Æ½µç¸Ð///////////////////////²É¼¯8´Î
+ 201   1          for(i=0;i<DIRECTION_COUNT;i++){
+ 202   2            vr[i]=adc_once(ADC_P12,ADC_10BIT);
+ 203   2             for(j=0;j<i;j++)
+ 204   2            {
+ 205   3              if(vr[i-j]>vr[i-j-1])        //Ã°ÅÝ·¨´Ó´óµ½Ð¡¶Ô²ÉÑùÖµÅÅÐò
+ 206   3              {
+ 207   4                change   = vr[i-j-1];
+ 208   4                vr[i-j-1]= vr[i-j];
+ 209   4                vr[i-j]  = change;
+ 210   4              }
+ 211   3            }
+ 212   2            for(i=1;i<DIRECTION_COUNT-1;i++)    //ÅÅºÃÐòºó£¬ÌÞ³ý1¸ö½ÏÐ¡ÖµºÍ1¸ö½Ï×î´óÖµ
+ 213   2            vracc+= vr[i];                //ºó£¬ÔÙÇóºÍÈ¡Æ½¾ù¡£
+ 214   2            mid_AD_shuiping=vracc/(DIRECTION_COUNT-2);
+ 215   2            vracc=0;
+ 216   2            
+ 217   2          }
+ 218   1        ////////////////////////×óË®Æ½µç¸Ð///////////////////////²É¼¯8´Î
+ 219   1          for(i=0;i<DIRECTION_COUNT;i++){
+ 220   2            vr[i]=adc_once(AMP1,ADC_10BIT);
+ 221   2             for(j=0;j<i;j++)
+ 222   2            {
+ 223   3              if(vr[i-j]>vr[i-j-1])        //Ã°ÅÝ·¨´Ó´óµ½Ð¡¶Ô²ÉÑùÖµÅÅÐò
+ 224   3              {
+ 225   4                change   = vr[i-j-1];
+ 226   4                vr[i-j-1]= vr[i-j];
+ 227   4                vr[i-j]  = change;
+ 228   4              }
+ 229   3            }
+ 230   2            for(i=1;i<DIRECTION_COUNT-1;i++)    //ÅÅºÃÐòºó£¬ÌÞ³ý1¸ö½ÏÐ¡ÖµºÍ1¸ö½Ï×î´óÖµ
+ 231   2            vracc+= vr[i];                //ºó£¬ÔÙÇóºÍÈ¡Æ½¾ù¡£
+ 232   2            left_AD_shuiping=vracc/(DIRECTION_COUNT-2);
+ 233   2            vracc=0;
+ 234   2            
+ 235   2          }
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 5   
+
+ 236   1        ////////////////////////ÓÒË®Æ½µç¸Ð///////////////////////
+ 237   1          for(i=0;i<DIRECTION_COUNT;i++){
+ 238   2            vr[i]=adc_once(AMP2,ADC_10BIT);
+ 239   2             for(j=0;j<i;j++)
+ 240   2            {
+ 241   3              if(vr[i-j]>vr[i-j-1])        //Ã°ÅÝ·¨´Ó´óµ½Ð¡¶Ô²ÉÑùÖµÅÅÐò
+ 242   3              {
+ 243   4                change   = vr[i-j-1];
+ 244   4                vr[i-j-1]= vr[i-j];
+ 245   4                vr[i-j]  = change;
+ 246   4              }
+ 247   3            }
+ 248   2            for(i=1;i<DIRECTION_COUNT-1;i++)    //ÅÅºÃÐòºó£¬ÌÞ³ý1¸ö½ÏÐ¡ÖµºÍ1¸ö½Ï×î´óÖµ
+ 249   2            vracc+= vr[i];                //ºó£¬ÔÙÇóºÍÈ¡Æ½¾ù¡£
+ 250   2            right_AD_shuiping=vracc/(DIRECTION_COUNT-2);
+ 251   2            vracc=0;
+ 252   2            
+ 253   2          }
+ 254   1        ////////////////////////×óÊúÖ±µç¸Ð///////////////////////
+ 255   1          for(i=0;i<DIRECTION_COUNT;i++){
+ 256   2            vr[i]=adc_once(ADC_P02,ADC_10BIT);
+ 257   2             for(j=0;j<i;j++)
+ 258   2            {
+ 259   3              if(vr[i-j]>vr[i-j-1])        //Ã°ÅÝ·¨´Ó´óµ½Ð¡¶Ô²ÉÑùÖµÅÅÐò
+ 260   3              {
+ 261   4                change   = vr[i-j-1];
+ 262   4                vr[i-j-1]= vr[i-j];
+ 263   4                vr[i-j]  = change;
+ 264   4              }
+ 265   3            }
+ 266   2            for(i=1;i<DIRECTION_COUNT-1;i++)    //ÅÅºÃÐòºó£¬ÌÞ³ý1¸ö½ÏÐ¡ÖµºÍ1¸ö½Ï×î´óÖµ
+ 267   2            vracc+= vr[i];                //ºó£¬ÔÙÇóºÍÈ¡Æ½¾ù¡£
+ 268   2            left_AD_shuzhi=vracc/(DIRECTION_COUNT-2);
+ 269   2            vracc=0;
+ 270   2            
+ 271   2          }
+ 272   1          ////////////////////////ÓÒÊúÖ±µç¸Ð///////////////////////
+ 273   1          for(i=0;i<DIRECTION_COUNT;i++){
+ 274   2            vr[i]=adc_once(ADC_P03,ADC_10BIT);
+ 275   2             for(j=0;j<i;j++)
+ 276   2            {
+ 277   3              if(vr[i-j]>vr[i-j-1])        //Ã°ÅÝ·¨´Ó´óµ½Ð¡¶Ô²ÉÑùÖµÅÅÐò
+ 278   3              {
+ 279   4                change   = vr[i-j-1];
+ 280   4                vr[i-j-1]= vr[i-j];
+ 281   4                vr[i-j]  = change;
+ 282   4              }
+ 283   3            }
+ 284   2            for(i=1;i<DIRECTION_COUNT-1;i++)    //ÅÅºÃÐòºó£¬ÌÞ³ý1¸ö½ÏÐ¡ÖµºÍ1¸ö½Ï×î´óÖµ
+ 285   2            vracc+= vr[i];                //ºó£¬ÔÙÇóºÍÈ¡Æ½¾ù¡£
+ 286   2            right_AD_shuzhi=vracc/(DIRECTION_COUNT-2);
+ 287   2            vracc=0;
+ 288   2        ////////////////////////////////////////////////////    
+ 289   2          }
+ 290   1          for(i=0;i<DIRECTION_COUNT;i++)    //²É¼¯8´Î
+ 291   1          { 
+ 292   2            //left_AD_Date+=adc_once(AMP1,ADC_10BIT);
+ 293   2            //right_AD_Date+=adc_once(AMP2,ADC_10BIT);
+ 294   2            temp+= icm_gyro_x;            //Ðè¸Ä¶¯  ¸ÃÍÓÂÝÒÇ·½Ïò
+ 295   2          }
+ 296   1            
+ 297   1            if(diangan_flag==0)
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 6   
+
+ 298   1              {
+ 299   2            g_fLeftVoltageSigma +=(int) ( left_AD_shuiping- LEFT_AD_SHUIPING_OFFEST);
+ 300   2            g_fRightVoltageSigma +=(int) (right_AD_shuiping - RIGHT_AD_SHUIPING_OFFEST);
+ 301   2              }
+ 302   1              else {
+ 303   2               g_fLeftVoltageSigma +=(int) ( left_AD_shuzhi- LEFT_AD_SHUZHI_OFFEST);
+ 304   2              g_fRightVoltageSigma +=(int) (right_AD_shuzhi - RIGHT_AD_SHUZHI_OFFEST);
+ 305   2              }
+ 306   1      /////////////////////////////×ªÏò»·¿ØÖÆ//////////////////////////////////////////////////
+ 307   1            if(turn_flag==0){
+ 308   2                DIR_CONTROL_D_VALUE +=(int) (temp/DIRECTION_COUNT - DIRECTION_OFFSET); 
+ 309   2            }
+ 310   1            else if (turn_flag==1){
+ 311   2                DIR_CONTROL_D_VALUE +=(int) (temp/DIRECTION_COUNT - DIRECTION_OFFSET+corner_ruku);                //Èë¿â×ªÏò
+ 312   2                  turn_flag=0;
+ 313   2            }
+ 314   1            else if (turn_flag==2){
+ 315   2                DIR_CONTROL_D_VALUE +=(int) (temp/DIRECTION_COUNT - DIRECTION_OFFSET+corner_chuku);               //³ö¿â×ªÏò
+ 316   2                  turn_flag=0;
+ 317   2            }
+ 318   1      }
+ 319          //**************************************************************************
+ 320          //  @brief      ·½Ïò¼ÆËãº¯Êý
+ 321          //  @return     void
+ 322          //  ²ÎÊý    DIRECTION_CONTROL_COUNT £ºÀÛ¼Ó´ÎÊý 2
+ 323          //        DIR_CONTROL_P£º   PÖµ
+ 324          //        DIR_CONTROL_D£º   ÍÓÂÝÒÇDÖµ
+ 325          //        DIRECTION_OFFSET£º  ³µÄ£×ª¶¯£¨³µÄ£×ª¶¯ÍÓÂÝÒÇÁãµãÆ«ÒÆ£©
+ 326          //        DIR_CONTROL_D_VALUE£º ÍÓÂÝÒÇ×ª¶¯²âÁ¿
+ 327          //  º¯Êý½á¹û£º  ËÙ¶ÈÊä³öÖµ
+ 328          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+ 329          //**************************************************************************
+ 330          void DirectionControl(void) {
+ 331   1      
+ 332   1          float fLeftRightAdd, fLeftRightSub, fValue=0;
+ 333   1          int nLeft, nRight ,turn ; 
+ 334   1          float mid=mid_AD_shuiping-MID_AD_SHUIPING_OFFEST;
+ 335   1      
+ 336   1          nLeft = (int)(g_fLeftVoltageSigma /= DIRECTION_CONTROL_COUNT);      //Æ½¾ùºó
+ 337   1          nRight = (int)(g_fRightVoltageSigma /= DIRECTION_CONTROL_COUNT);
+ 338   1          turn = (int)(DIR_CONTROL_D_VALUE/= DIRECTION_CONTROL_COUNT);
+ 339   1      
+ 340   1          g_fLeftVoltageSigma = 0;
+ 341   1          g_fRightVoltageSigma = 0;
+ 342   1          DIR_CONTROL_D_VALUE = 0;
+ 343   1      
+ 344   1          fLeftRightAdd = nLeft + nRight;
+ 345   1          fLeftRightSub = nLeft - nRight;
+ 346   1      
+ 347   1          fec=fe;
+ 348   1          fe=150*fLeftRightSub/(fLeftRightAdd+mid);                 //»¹ÓÐÐ¡°×µÄµç¸Ð¶¨Î»·½°¸ºÍ¹úÒ»Ë«³µµç¸Ð¶¨Î»·½°¸£¬150ÊýÖ
+             -µ¿Éµ÷£¿
+ 349   1          
+ 350   1          g_fDirectionControlOutOld = g_fDirectionControlOutNew;    //Õâ¸öÖÜÆÚµÄÀÏµÈÓÚÉÏ¸öÖÜÆÚµÄÐÂ
+ 351   1      
+ 352   1          if(fLeftRightAdd < LEFT_RIGHT_MINIMUM) {
+ 353   2      
+ 354   2          g_fDirectionControlOutNew = 0;
+ 355   2      
+ 356   2          } else {
+ 357   2            speed_fuzzy_mem_cal_forecast();
+ 358   2            speed_fuzzy_query_forecast();
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 7   
+
+ 359   2            speed_fuzzy_solve_forecast();
+ 360   2            speedcontrol_forecast();
+ 361   2      
+ 362   2            speed_fuzzy_mem_cal_fe();
+ 363   2            speed_fuzzy_query_fe();
+ 364   2            speed_fuzzy_solve_fe();
+ 365   2            
+ 366   2          fValue = fe * control_P ;
+ 367   2              
+ 368   2          turn *= DIR_D;
+ 369   2      
+ 370   2          fValue += turn;
+ 371   2      
+ 372   2          g_fDirectionControlOutNew = fValue;      
+ 373   2             }
+ 374   1      }
+ 375          
+ 376          //**************************************************************************
+ 377          //  @brief      ·½ÏòÆ½»¬Êä³ö
+ 378          //  @return     void
+ 379          //  º¯Êý½á¹û£º  ·½ÏòÊä³ö
+ 380          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+ 381          //**************************************************************************
+ 382          void DirectionControlOutput(void) {
+ 383   1      
+ 384   1          float fValue;
+ 385   1      
+ 386   1          fValue = g_fDirectionControlOutNew - g_fDirectionControlOutOld;
+ 387   1          g_fDirectionControlOut = fValue *  1 / DIRECTION_CONTROL_COUNT + g_fDirectionControlOutOld;
+ 388   1      }
+ 389          
+ 390          //**************************************************************************
+ 391          //  @brief      µç»úÊä³ö¿ØÖÆ
+ 392          //  @return     void
+ 393          //  º¯Êý½á¹û£º  µç»úÊä³öÖµ
+ 394          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+ 395          //**************************************************************************
+ 396          void MotorOutput(void) {
+ 397   1      
+ 398   1          float fLeft, fRight;
+ 399   1      
+ 400   1          fLeft = g_fAngleControlOut -
+ 401   1          g_fSpeedControlOut -
+ 402   1          g_fDirectionControlOut;
+ 403   1          fRight = g_fAngleControlOut -
+ 404   1          g_fSpeedControlOut +
+ 405   1          g_fDirectionControlOut;
+ 406   1      
+ 407   1          g_fLeftMotorOut = fLeft;
+ 408   1          g_fRightMotorOut = fRight;
+ 409   1          MotorSpeedOut();
+ 410   1      }
+ 411          
+ 412          //**************************************************************************
+ 413          //  @brief      µç»úPWM¼ÆËãº¯Êý
+ 414          //  @return     void
+ 415          //  ²ÎÊý    MOTOR_OUT_DEAD_VAL£º    ËÀÇø²¹³¥µçÑ¹
+ 416          //  º¯Êý½á¹û£º  µç»úPWMÊä³öÖµ
+ 417          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+ 418          //**************************************************************************
+ 419          void MotorSpeedOut(void) {
+ 420   1      
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 8   
+
+ 421   1          float fLeftVal, fRightVal;
+ 422   1      
+ 423   1          fLeftVal = g_fLeftMotorOut;
+ 424   1          fRightVal = g_fRightMotorOut;
+ 425   1      
+ 426   1          if(fLeftVal > 0)
+ 427   1          fLeftVal += MOTOR_OUT_DEAD_VAL;
+ 428   1          else if(fLeftVal < 0)
+ 429   1          fLeftVal -= MOTOR_OUT_DEAD_VAL;
+ 430   1      
+ 431   1          if(fRightVal > 0)
+ 432   1          fRightVal += MOTOR_OUT_DEAD_VAL;
+ 433   1          else if(fRightVal < 0)
+ 434   1          fRightVal -= MOTOR_OUT_DEAD_VAL;
+ 435   1      
+ 436   1          if(fLeftVal > MOTOR_OUT_MAX)    //ÏÞ·ù
+ 437   1          fLeftVal = MOTOR_OUT_MAX;
+ 438   1          if(fLeftVal < MOTOR_OUT_MIN)
+ 439   1          fLeftVal = MOTOR_OUT_MIN;
+ 440   1      
+ 441   1          if(fRightVal > MOTOR_OUT_MAX)
+ 442   1          fRightVal = MOTOR_OUT_MAX;
+ 443   1          if(fRightVal < MOTOR_OUT_MIN)
+ 444   1          fRightVal = MOTOR_OUT_MIN;
+ 445   1      
+ 446   1          SetMotorVoltage(fLeftVal, fRightVal);
+ 447   1      }
+ 448          
+ 449          //**************************************************************************
+ 450          //  @brief      PWMÊä³öÉèÖÃº¯Êý
+ 451          //  @return     void
+ 452          //  º¯Êý½á¹û£º  µç»úPWMÊä³öÖµ
+ 453          //  ±¸×¢£º²Î¿¼Çå»ªÔ´Âë
+ 454          //**************************************************************************
+ 455          void SetMotorVoltage(float fLeftVoltage, float fRightVoltage) {
+ 456   1        if(stop_flag==0)
+ 457   1          {
+ 458   2          if(fLeftVoltage >= 0)    
+ 459   2              {
+ 460   3                  pwm_duty(PWM2_P26,0);
+ 461   3                  pwm_duty(PWM2_P22,(uint32)fLeftVoltage);   
+ 462   3              }
+ 463   2              else
+ 464   2              {
+ 465   3                  pwm_duty(PWM2_P22,0);
+ 466   3                  pwm_duty(PWM2_P26,(uint32)(-fLeftVoltage)); 
+ 467   3              }
+ 468   2      
+ 469   2           if(fRightVoltage >= 0) 
+ 470   2              {
+ 471   3                  pwm_duty(PWM1_P17,0);
+ 472   3                  pwm_duty(PWM1_P10,(uint32)fRightVoltage);   
+ 473   3              }
+ 474   2              else
+ 475   2              {
+ 476   3                  pwm_duty(PWM1_P10,0);
+ 477   3                  pwm_duty(PWM1_P17,(uint32)(-fRightVoltage));   
+ 478   3              }
+ 479   2          } 
+ 480   1              if(stop_flag==1){
+ 481   2                
+ 482   2                    pwm_duty(PWM2_P26,0);           //µç»úÖÆ¶¯
+C51 COMPILER V9.60.0.0   CONTROL                                                           08/05/2020 22:00:20 PAGE 9   
+
+ 483   2                  pwm_duty(PWM2_P22,0);
+ 484   2                  pwm_duty(PWM1_P10,0);
+ 485   2                  pwm_duty(PWM1_P17,0);
+ 486   2              
+ 487   2              pca_delay_ms(100);
+ 488   2              }
+ 489   1                
+ 490   1      }
+ 491          
+ 492          void OutPut_Vcan(void)
+ 493          {
+ 494   1            uint8 var[14];
+ 495   1            
+ 496   1           var[0] =VOLTAGE_GRAVITY;     //¼ÓËÙ¶È¼ÆzÖá
+ 497   1           var[1] ='\n';
+ 498   1           var[2] =VOLTAGE_GYRO;            //ÍÓÂÝÒÇyÖá
+ 499   1           var[3] = '\n';
+ 500   1           var[4] =left_AD_shuiping;
+ 501   1           var[5] ='\n';
+ 502   1           var[6] =right_AD_shuiping;
+ 503   1           var[7] = '\n';
+ 504   1           var[8] =left_AD_shuzhi;
+ 505   1           var[9] ='\n';
+ 506   1           var[10] =right_AD_shuzhi;
+ 507   1           var[11]= '\n';
+ 508   1           var[12] =icm_gyro_x;          //ÍÓÂÝÒÇxÖá£¨³µÄ£×ª¶¯½Ç¶È£©
+ 509   1           var[13]= '\n';
+ 510   1        
+ 511   1          uart_putbuff(UART_2,&var[0],14);
+ 512   1          //data_conversion(var[0], var[1], var[2], var[3], *dat);
+ 513   1          //seekfree_wireless_send_buff(dat, 4);
+ 514   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   6359    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    166     124
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

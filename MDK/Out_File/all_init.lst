@@ -1,0 +1,103 @@
+C51 COMPILER V9.60.0.0   ALL_INIT                                                          08/05/2020 22:00:17 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE ALL_INIT
+OBJECT MODULE PLACED IN .\Out_File\all_init.obj
+COMPILER INVOKED BY: D:\keil_v5\C51\BIN\C51.EXE ..\Libraries\seekfree_libraries\all_init.c LARGE OPTIMIZE(8,SPEED) BROWS
+                    -E MODP2 INCDIR(..\Libraries\libraries;..\Libraries\seekfree_libraries;..\Libraries\seekfree_peripheral;..\USER\inc;..\US
+                    -ER\src;..\Libraries\Control) DEBUG OBJECTEXTEND PRINT(.\Out_File\all_init.lst) TABS(2) OBJECT(.\Out_File\all_init.obj)
+
+line level    source
+
+   1          #include "all_init.h"
+   2          
+   3          void GPIO_Initialization(void)
+   4          {
+   5   1          //所有管脚初始化  
+   6   1          board_init();
+   7   1          //按键初始化
+   8   1          key_init(KEY_1);    //初始化P3_2, 数值++
+   9   1          key_init(KEY_2);    //初始化P3_3, 数值--
+  10   1          key_init(KEY_3);    //初始化P5_0, 数值+50
+  11   1          key_init(KEY_4);    //初始化P5_1, 数值-50
+  12   1          //拨码器初始化
+  13   1          gpio_mode(P3_0,GPIO);   //初始化
+  14   1          gpio_mode(P3_1,GPIO);
+  15   1          gpio_mode(P4_6,GPIO);
+  16   1          //蜂鸣器初始化
+  17   1          gpio_mode(P5_4,GPIO);   //初始化，输出，初始化低电平
+  18   1      }
+  19          
+  20          void PWM_Initialization(void)
+  21          {
+  22   1           pwm_init(PWM2_P22, 13000, 0);    //左电机前进            
+  23   1           pwm_init(PWM2_P26, 13000, 0);    //左电机后退
+  24   1           pwm_init(PWM1_P10, 13000, 0);    //右电机前进        
+  25   1           pwm_init(PWM1_P17, 13000, 0);    //右电机后退
+  26   1      }
+  27          
+  28          void Ctimer_Count_Initialization(void)
+  29          {
+  30   1          ctimer_count_init(CTIM3_P04);   //左电机的编码器
+  31   1          ctimer_count_init(CTIM0_P34);   //右电机的编码器
+  32   1      }
+  33          
+  34          void UART_Initialization(void)
+  35          {
+  36   1          seekfree_wireless_init();   //和上位机通信
+  37   1      }
+  38          
+  39          void ICM_20602_Initialization(void)
+  40          {
+  41   1          
+  42   1          icm20602_init_spi();          //硬件spi icm20602
+  43   1          get_icm20602_accdata_spi();   //获取加速度计数据
+  44   1          get_icm20602_gyro_spi();      //获取陀螺仪数据
+  45   1      }
+  46          
+  47          void ADC_Initialization(void)
+  48          {
+  49   1          //数据采集
+  50   1          adc_init(ADC_P00,ADC_SYSclk_DIV_2);   //左电感采集
+  51   1          adc_init(ADC_P01,ADC_SYSclk_DIV_2);   //右电感采集
+  52   1          adc_init(ADC_P02,ADC_SYSclk_DIV_2);   //陀螺仪 icm20602 角速度
+  53   1          adc_init(ADC_P03,ADC_SYSclk_DIV_2);   //加速度计 角度
+C51 COMPILER V9.60.0.0   ALL_INIT                                                          08/05/2020 22:00:17 PAGE 2   
+
+  54   1          adc_init(ADC_P16,ADC_SYSclk_DIV_2);   //加速度计 车模转动
+  55   1          adc_init(ADC_P11,ADC_SYSclk_DIV_2);   //电容电压检测
+  56   1      }
+  57          
+  58          void OLED_Initialization(void)
+  59          {
+  60   1          //OLED初始化
+  61   1          oled_init();
+  62   1      } 
+  63          
+  64          void all_init()
+  65          {
+  66   1         GPIO_Initialization();         //IO口初始化
+  67   1         PWM_Initialization();          //PWM模块初始化
+  68   1         Ctimer_Count_Initialization();     //编码器初始化
+  69   1         UART_Initialization();         //串口初始化
+  70   1         ICM_20602_Initialization();          //spi初始化
+  71   1         ADC_Initialization();            //ADC初始化
+  72   1         OLED_Initialization();         //OLED初始化
+  73   1      
+  74   1      }   
+  75          
+  76            
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    227    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      2    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

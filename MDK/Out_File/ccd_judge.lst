@@ -1,0 +1,133 @@
+C51 COMPILER V9.60.0.0   CCD_JUDGE                                                         08/05/2020 22:00:20 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE CCD_JUDGE
+OBJECT MODULE PLACED IN .\Out_File\ccd_judge.obj
+COMPILER INVOKED BY: D:\keil_v5\C51\BIN\C51.EXE ..\Libraries\Control\ccd_judge.c LARGE OPTIMIZE(8,SPEED) BROWSE MODP2 IN
+                    -CDIR(..\Libraries\libraries;..\Libraries\seekfree_libraries;..\Libraries\seekfree_peripheral;..\USER\inc;..\USER\src;..\
+                    -Libraries\Control) DEBUG OBJECTEXTEND PRINT(.\Out_File\ccd_judge.lst) TABS(2) OBJECT(.\Out_File\ccd_judge.obj)
+
+line level    source
+
+   1          #include "headfile.h"
+   2          
+   3          //board.h文件中FOSC的值设置为0,则程序自动识别系统频率
+   4          
+   5          /*board.h文件中FOSC的值设置不为0，则系统频率为FOSC的值，
+   6          在使用stc-isp工具下载程序的时候需要将IRC频率设置为FOSC的值*/
+   7          int ruku_flag=0;
+   8          int ruku_distance_flag=0;
+   9          int chuku_distance_flag=0;
+  10          int left_huandao_distance_flag=0,right_huandao_distance_flag=0;
+  11          uint8 ruku_distance,chuku_distance;
+  12          float left_huandao_distance,right_huandao_distance;
+  13          
+  14          
+  15          void zebra_judge()
+  16          {
+  17   1      if(ruku_flag==0){
+  18   2          uint8 max,i,dif,n,k;    //max阈值，dif两点间差值，n为定义的超出阈值次数
+  19   2        //DisableGlobalIRQ();     //关闭总中断
+  20   2        //board_init();       //初始化寄存器
+  21   2        ccd_init();         //TSL1401线阵CCD初始化
+  22   2        //EnableGlobalIRQ();      //开启总中断
+  23   2        ccd_collect();
+  24   2          //发送图像到上位机
+  25   2        ccd_send_data(UART_1, ccd_data);
+  26   2        //采集完成标志位清除      
+  27   2        //tsl1401_finish_flag = 0;
+  28   2        for(i=0;i<120;i++)
+  29   2          {
+  30   3           dif=ccd_data[i]-ccd_data[i+1];
+  31   3           if(dif>max)k=k+1;
+  32   3          }
+  33   2          if(k>n)
+  34   2          {
+  35   3                                                                                        //开始转弯进入车库                                                                  
+  36   3              turn_flag=1 ;           //转向标志                                        //通过转向环控制
+  37   3                                                                                        //设置状态位
+  38   3            //distance+=g_fCarSpeed;        //计量路程
+  39   3            ruku_distance_flag=1;                 //开始计量路程
+  40   3            ruku_flag=1;                          //使不再判断斑马线
+  41   3            
+  42   3          } 
+  43   2        }
+  44   1      }
+  45          
+  46              void chuku(){                           //出库
+  47   1            if(star_flag==1)
+  48   1              {  //float distance;
+  49   2                //distance+=g_fCarSpeed;          //计量路程
+  50   2                chuku_distance_flag=1;
+  51   2                if(chuku_distance>0){
+  52   3                                                                              //打角      直接控制g_fDirectionControlOut???
+  53   3                                                                              //是否需要电感阈值？
+C51 COMPILER V9.60.0.0   CCD_JUDGE                                                         08/05/2020 22:00:20 PAGE 2   
+
+  54   3      /////////////////方案一，直接改电感值转向////////////////////////////
+  55   3                    //g_fLeftVoltageSigma=0;
+  56   3                    //g_fRightVoltageSigma=0;
+  57   3                  
+  58   3      //////////////////方案二，改陀螺仪值的大小///////////////////////////
+  59   3                  turn_flag=2;
+  60   3                  
+  61   3                  
+  62   3      ////////////////////方案三，直接改电机//////////////////////////
+  63   3                                                                                //改标志位
+  64   3                chuku_distance_flag=0;
+  65   3                star_flag=2;     //改变全局变量标志位，使不再进入循环
+  66   3                }
+  67   2                
+  68   2              }
+  69   1          }
+  70          
+  71              
+  72              void distance()
+  73              {
+  74   1            if(ruku_distance_flag==1){
+  75   2                ruku_distance+=g_fCarSpeed;
+  76   2            }
+  77   1            
+  78   1            if(chuku_distance_flag==1){
+  79   2                chuku_distance+=g_fCarSpeed;
+  80   2            }
+  81   1            
+  82   1            if(left_huandao_distance_flag==1){
+  83   2                left_huandao_distance+=g_fCarSpeed;
+  84   2            }
+  85   1            
+  86   1            if(right_huandao_distance_flag==1){
+  87   2                right_huandao_distance_flag+=g_fCarSpeed;
+  88   2            }
+  89   1            
+  90   1          
+  91   1          }
+  92              
+  93              void stop_car()
+  94              {
+  95   1            if(ruku_distance>0){
+  96   2               
+  97   2                  stop_flag=1;           //电机制动标志
+  98   2              ruku_distance_flag=0;       //清楚标志位，使不再进行路径积分
+  99   2            }
+ 100   1          }
+ 101              
+ 102              
+ 103              
+ 104              
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    416    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     22       5
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+C51 COMPILER V9.60.0.0   CCD_JUDGE                                                         08/05/2020 22:00:20 PAGE 3   
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

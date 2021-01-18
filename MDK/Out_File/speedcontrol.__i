@@ -1,0 +1,1 @@
+"..\Libraries\Control\speedcontrol.c" LARGE OPTIMIZE (8,SPEED) BROWSE MODP2 INCDIR(..\Libraries\libraries;..\Libraries\seekfree_libraries;..\Libraries\seekfree_peripheral;..\USER\inc;..\USER\src;..\Libraries\Control) DEBUG OBJECTEXTEND PRINT(.\Out_File\speedcontrol.lst) TABS (2) OBJECT(.\Out_File\speedcontrol.obj)

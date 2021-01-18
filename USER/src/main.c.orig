@@ -1,0 +1,76 @@
+ #include "headfile.h"
+ #include <string.h>
+
+	sbit  LED  =  P5^2;
+
+	uint8 test;
+
+
+
+
+
+
+
+extern uint8 flag;
+void board_init(void)
+{
+
+//	P_SW2 = 0x80;
+
+//	XOSCCR |= 1<<7;  		// 使能外部晶体振荡器
+//	XOSCCR |= 1<<6;  		// 外部时钟源是晶体振荡器。信号源连接单片机的 XTALI （ P1.7 ）和 XTALO （ P1.6 ）
+//	while (!(XOSCCR & 1));  // 等待时钟稳定
+//	CLKDIV = 0x00;
+//	CKSEL = 0x01;  		// 选择外部晶振
+//	P_SW2 = 0x00;
+	
+	P_SW2 = 0x80;
+	CKSEL = 0x00;  // 选择内部 IRC (  默认 )
+	P_SW2 = 0x00;
+}
+
+
+
+void main()
+{
+	board_init();
+
+	uart_init(UART_1,115200);
+//	lcd_init();
+	
+//	P0M0 = 0x00;
+//	P0M1 = 0x00;
+//	P1M0 = 0x00;
+//	P1M1 = 0x00;
+//	P2M0 = 0x00;
+//	P2M1 = 0x00;
+//	P3M0 = 0x00;
+//	P3M1 = 0x00;
+//	P4M0 = 0x00;
+//	P4M1 = 0x00;
+	P5M0 = 0x00;
+	P5M1 = 0x00;
+	
+	LED = 0;
+	for(;;)
+	{
+//		if(USART_RX_STA & 0xC000)
+//		{
+//			UartSendStr(uart1_rx_buff,USART_RX_STA&0x3FFF);
+//			USART_RX_STA = 0;
+//		}
+//		if(memcmp((uint8 *)"CLOSE",uart1_rx_buff,5) == 0)
+//		{
+//			LED = 1;
+//		}
+//		lcd_clear(RED);
+//		lcd_clear(BLUE);
+//		lcd_clear(GREEN);
+		
+		delay_ms(1);
+		LED = !LED;
+	}
+}
+
+
+

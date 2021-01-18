@@ -1,0 +1,1 @@
+"..\Libraries\Control\Angle.c" LARGE BROWSE MODP2 INCDIR(..\Libraries\libraries;..\Libraries\seekfree_libraries;..\Libraries\seekfree_peripheral;..\USER\inc;..\USER\src;..\Libraries\Control) DEBUG OBJECTEXTEND PRINT(.\Out_File\Angle.lst) OBJECT(.\Out_File\Angle.obj)
